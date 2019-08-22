@@ -61,6 +61,11 @@ export default class SignaturePad {
   private _lastVelocity: number;
   private _lastWidth: number;
   private _strokeMoveUpdate: (event: MouseEvent | Touch) => void;
+  private _leftMostCoord: number;
+  private _rightMostCoord: number;
+  private _topMostCoord: number;
+  private _bottomMostCoord: number;
+
   /* tslint:enable: variable-name */
 
   constructor(
@@ -93,6 +98,10 @@ export default class SignaturePad {
     this.backgroundColor = options.backgroundColor || 'rgba(0,0,0,0)';
     this.onBegin = options.onBegin;
     this.onEnd = options.onEnd;
+    this._leftMostCoord = canvas.width;
+    this._rightMostCoord = 0;
+    this._topMostCoord = canvas.height;
+    this._bottomMostCoord = 0;
 
     this._ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
     this.clear();
@@ -143,10 +152,10 @@ export default class SignaturePad {
     this._isEmpty = false;
   }
 
-  public toDataURL(type = 'image/png', encoderOptions?: number) {
+  public toDataURL(type = 'image/png', { crop, encoderOptions }: {crop?: boolean, encoderOptions?: number} = { crop: false, encoderOptions: undefined }) {
     switch (type) {
       case 'image/svg+xml':
-        return this._toSVG();
+        return this._toSVG(crop);
       default:
         return this.canvas.toDataURL(type, encoderOptions);
     }
@@ -271,11 +280,32 @@ export default class SignaturePad {
     this._strokeUpdate(event);
   }
 
+  private _updateEdgeCoordinates(point: Point): void {
+    if (point.x < this._leftMostCoord) {
+      this._leftMostCoord = point.x;
+    }
+
+    if(point.y < this._topMostCoord) {
+      this._topMostCoord = point.y;
+    }
+
+    if(point.x > this._rightMostCoord) {
+      this._rightMostCoord = point.x;
+    }
+
+    if(point.y > this._bottomMostCoord) {
+      this._bottomMostCoord = point.y;
+    }
+  }
+
   private _strokeUpdate(event: MouseEvent | Touch): void {
     const x = event.clientX;
     const y = event.clientY;
 
     const point = this._createPoint(x, y);
+
+    this._updateEdgeCoordinates(point);
+
     const lastPointGroup = this._data[this._data.length - 1];
     const lastPoints = lastPointGroup.points;
     const lastPoint =
@@ -499,17 +529,35 @@ export default class SignaturePad {
     }
   }
 
-  private _toSVG(): string {
+  private _toSVG(crop: boolean = false): string {
     const pointGroups = this._data;
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
     const minX = 0;
     const minY = 0;
-    const maxX = this.canvas.width / ratio;
-    const maxY = this.canvas.height / ratio;
+    let maxX = this.canvas.width / ratio;
+    let maxY = this.canvas.height / ratio;
+
+    if (crop) {
+      const cropDimensions = this._getCropShiftAndWidth();
+
+      const shiftedPoints = pointGroups[0].points
+        .map(point => (
+          {
+            ...point, x: point.x - cropDimensions.shift.x, y: point.y - cropDimensions.shift.y
+          }));
+
+      pointGroups[0] = {...pointGroups[0], points: shiftedPoints};
+
+      maxX = cropDimensions.width;
+      maxY = cropDimensions.height;
+
+    }
+
+
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 
-    svg.setAttribute('width', this.canvas.width.toString());
-    svg.setAttribute('height', this.canvas.height.toString());
+    svg.setAttribute('width', String(maxX));
+    svg.setAttribute('height', String(maxY));
 
     this._fromData(
       pointGroups,
@@ -588,4 +636,16 @@ export default class SignaturePad {
 
     return prefix + btoa(data);
   }
+
+  private _getCropShiftAndWidth() {
+    return {
+      height: this._bottomMostCoord - this._topMostCoord,
+      shift: {
+        x: this._leftMostCoord,
+        y: this._topMostCoord,
+      },
+      width: this._rightMostCoord - this._leftMostCoord,
+    }
+  }
+
 }
