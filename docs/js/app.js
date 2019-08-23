@@ -119,7 +119,7 @@ saveSVGButton.addEventListener("click", function (event) {
   if (signaturePad.isEmpty()) {
     alert("Please provide a signature first.");
   } else {
-    var dataURL = signaturePad.toDataURL('image/svg+xml');
+    var dataURL = signaturePad.toDataURL('image/svg+xml', { crop: true });
     download(dataURL, "signature.svg");
   }
 });
