@@ -638,13 +638,17 @@ export default class SignaturePad {
   }
 
   private _getCropShiftAndWidth() {
+
+    // Add some padding to prevent crop from cutting curves.
+    const cropPadding = 2;
+
     return {
-      height: this._bottomMostCoord - this._topMostCoord,
+      height: this._bottomMostCoord - this._topMostCoord + cropPadding,
       shift: {
-        x: this._leftMostCoord,
-        y: this._topMostCoord,
+        x: this._leftMostCoord - cropPadding,
+        y: this._topMostCoord - cropPadding,
       },
-      width: this._rightMostCoord - this._leftMostCoord,
+      width: this._rightMostCoord - this._leftMostCoord + cropPadding,
     }
   }
 
